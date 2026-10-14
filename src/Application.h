@@ -1,69 +1,53 @@
 #pragma once
-#include "Account.h"
-#include "Vector.h"
-#include "Topic.h"
-
-#include "AccountDA.h"
-#include "TopicDA.h"
 
 #include <string>
 
+#include "Forum.h"
+#include "Terminal.h"
 
-/* Main body of the application and exposes Run method to run the application */
+/* The terminal front-end: menus on top of a Forum. */
 class Application
 {
-private:
-	Account* acc;
-	bool isLoggedIn;
-
-	AccountDA accDA;
-	TopicDA topicDA;
-
-	int sortState;
-
 public:
-	/* Constructor and Destructor */
-	Application();
-	~Application();
+	Application(Forum& forum, const Terminal& terminal);
 
-	/* Runs the program */
-	int Run();
+	/* Runs until the user exits or the input ends. Returns the process exit code. */
+	int run();
 
-	/* Prints the login menu and main menu */
-	void printLoginMenu();
-	void printMainMenu();
+private:
+	/* Thrown when the input ends, to unwind out of whatever menu is open */
+	struct EndOfInput { };
 
-	bool handleLoginMenu(int choice);
-	void handleMainMenu(int choice);
+	std::string ask(const std::string& prompt);
+	std::string askPassword(const std::string& prompt);
+	bool confirm(const std::string& question);
 
-	/* Prompts the user to log in to an Account */
-	bool promptForLoginUser();
-	
-	/* Prompts the user to register an Account, checks for duplicates */
-	bool promptForRegisterUser();
+	/* Shows a one-line message, then pauses briefly (when interactive) */
+	void notice(const std::string& message, bool good);
 
-	/* Handle the changing of the password for the current account */
-	bool handleChangePassword();
+	/* Reports a failed Forum call; returns true for Status::Ok */
+	bool report(Status status, const std::string& success, const std::string& invalid = "",
+		const std::string& conflict = "", const std::string& forbidden = "");
 
-	/* Displays and handle the topics */
-	void handleViewTopics();
-	void printViewTopicsMenu(Vector<std::string>& topicNames);
-	bool handleViewTopicsMenu(Vector<std::string>& topicNames, std::string choice);
-	void promptNewTopic(Vector<std::string>& topicNames);
+	bool loginMenu();   /* false when the user chose Exit */
+	void mainMenu();
 
-	void handleViewTopic(int nIndex);
-	
-	/* Displays and handles the topic details and posts of the topic */
-	void printViewTopicMenu(Topic& topic);
-	bool handleViewTopicMenu(Topic& topic, std::string choice);
-	void promptNewPost(Topic& topic);
+	void registerAccount();
+	void logIn();
+	void changePassword();
 
-	/* Display and handle the post details and replies of the post */
-	void handleViewPost(Topic& topic, Post& post, std::string username);
-	void printViewPostMenu(Post& post);
-	bool handleViewPostMenu(Topic& topic, Post& post, std::string username, std::string choice);
-	void promptNewReply(Post& post);
-	bool handleEditPost(Topic& topic, Post& post);
-	bool handleDeletePost(Topic& topic, Post& post);
+	void topicsMenu();
+	void newTopic();
+	void topicMenu(int topicId);
+	void newPost(int topicId);
+	void postMenu(int topicId, int postId);
+	void editPost(int topicId, int postId);
+	void searchMenu();
+
+	void printLogo() const;
+	std::string option(const char* key, const char* label, const char* keyColor, bool underlined = false) const;
+
+	Forum& forum_;
+	const Terminal& term_;
+	std::string user_;
 };
-
