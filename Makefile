@@ -3,6 +3,7 @@
 #   make            build everything
 #   make test       build and run the unit tests and end-to-end scripts
 #   make asan       run `make test` again with AddressSanitizer + UBSan
+#   make tsan       run `make test` again with ThreadSanitizer (checks the web server's locking)
 #   make ui-check   drive the web UI in headless Chrome (needs Node 22+ and Chrome)
 #   make run-web    start the web server on http://127.0.0.1:8080
 #   make run        start the terminal client
@@ -38,7 +39,7 @@ TEST_SRC := $(wildcard tests/test_*.cpp)
 TEST_BIN := $(TEST_SRC:tests/%.cpp=$(BUILD)/tests/%)
 E2E      := $(wildcard tests/*_e2e.sh)
 
-.PHONY: all test asan ui-check run run-web clean
+.PHONY: all test asan tsan ui-check run run-web clean
 .SECONDARY:
 all: $(BINS)
 
@@ -62,6 +63,9 @@ test: $(TEST_BIN) $(BINS)
 asan:
 	$(MAKE) BUILD=build-asan OPT=-O1 SAN="-fsanitize=address,undefined -fno-omit-frame-pointer" test
 
+tsan:
+	$(MAKE) BUILD=build-tsan OPT=-O1 SAN="-fsanitize=thread" test
+
 ui-check: $(BUILD)/forum-web
 	BUILD=$(BUILD) bash tests/ui_check.sh
 
@@ -72,6 +76,6 @@ run: $(BUILD)/forum
 	$(BUILD)/forum --data data
 
 clean:
-	rm -rf build build-asan
+	rm -rf build build-asan build-tsan
 
 -include $(shell find $(BUILD) -name '*.d' 2>/dev/null)
