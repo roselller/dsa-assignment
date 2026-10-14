@@ -47,3 +47,11 @@ bool containsIgnoreCase(const std::string& text, const std::string& pattern)
 	}
 	return false;
 }
+
+std::string toLowerAscii(const std::string& s)
+{
+	std::string out = s;
+	for (char& c : out)
+		c = lowerAscii(c);
+	return out;
+}

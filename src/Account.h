@@ -2,32 +2,21 @@
 
 #include <string>
 
-/* The Account of the user */
+/* A user account. Only a salted hash of the password is kept. */
 class Account
 {
-	std::string password;
-
 public:
 	std::string username;
+	std::string salt;
+	std::string hash;
 
-	/* Constructors */
-	Account() { }
-	Account(std::string strline);
-	Account(const Account&);
-	Account(Account&& acc);
+	Account() = default;
 
-	/* Constructors the Account using the username and password provided in registration */
-	Account(std::string username, std::string password);
+	/* New account with a fresh random salt */
+	static Account create(const std::string& username, const std::string& password);
 
-	/* Used to construct Account using data from line. See Topic and Post for more details. */
-	Account& operator=(const Account&) = default;
+	bool checkPassword(const std::string& password) const;
 
-	/* Returns true if the password matches the provided password, return false otherwise */
-	bool isCorrect(std::string password);
-
-	/* Used for writing to DataAccessor, see Topic and Post for more details */
-	friend std::ostream& operator<<(std::ostream& os, Account& acc);
-
-	/* Used for Vector for comparison, see Topic and Post for more details */
-	bool operator==(Account& acc);
+	/* Replaces the password, using a fresh salt */
+	void setPassword(const std::string& password);
 };

@@ -1,40 +1,33 @@
 #pragma once
+
+#include <ctime>
 #include <string>
 
-/* Class Used to reply to posts and subclass in Post and Topic as common traits */
+#include "Vector.h"
+
+/* Anything a user writes and others can like: a reply on its own, and the base of
+   Post and Topic. Ids come from the forum (unique across topics, posts and replies). */
 class Comment
 {
-private:
-	std::string title;
-	time_t timeCreated;
-	std::string username;
-	int likes;
-
 public:
-	/* Constructors */
-	Comment();
-	Comment(const Comment& comment);
-	Comment& operator=(const Comment& comment) = default;
-	Comment(Comment&& comment);
-	Comment& operator=(Comment&&) = default;
+	int id = 0;
+	std::string author;
+	std::string text;
+	std::time_t created = 0;
+	Vector<std::string> likedBy;
 
-	Comment(std::string title, std::string username);
-	Comment(std::string strline);
+	Comment() = default;
+	Comment(int id, std::string author, std::string text, std::time_t created) :
+		id(id), author(std::move(author)), text(std::move(text)), created(created)
+	{ }
 
-	/* Getters for fields */
-	std::string getTitle();
-	/* Gets the string form of timeCreated */
-	std::string getTimeCreated();
-	std::string getUsername();
-	int getLikes();
-	void addLike();
+	int likes() const { return likedBy.count(); }
+	bool isLikedBy(const std::string& user) const;
 
-	/* Used to compare the time, return true if it is latter, false otherwise */
-	bool isLaterThan(Comment& comment);
+	/* Likes if user has not liked this yet, otherwise removes the like.
+	   Returns true if user likes it afterwards. One like per user. */
+	bool toggleLike(const std::string& user);
 
-	/* Insertion into DataAccessor, see Topic and Post for more details */
-	friend std::ostream& operator << (std::ostream& os, Comment& comment);
-	
-	/* Comparison for subclasses, see Topic and Post for more detials */
-	bool operator==(Comment& comment);
+	/* "YYYY-MM-DD HH:MM:SS" in local time */
+	std::string createdString() const;
 };

@@ -1,51 +1,22 @@
 #include "Account.h"
-#include <string>
-#include <fstream>
-#include <filesystem>
 
-#include <Windows.h>
+#include "Sha256.h"
 
-Account::Account(std::string username, std::string password) : username(username),
-	password(password)
-{ }
-
-Account::Account(const Account& acc) :
-	username(acc.username),
-	password(acc.password)
+Account Account::create(const std::string& username, const std::string& password)
 {
-#if defined(_DEBUG)
-	OutputDebugStringA("Account_CC\n");
-#endif
+	Account acc;
+	acc.username = username;
+	acc.setPassword(password);
+	return acc;
 }
 
-Account::Account(Account&& acc) :
-	username(std::move(acc.username)),
-	password(std::move(acc.password))
+bool Account::checkPassword(const std::string& password) const
 {
-#if defined(_DEBUG)
-	OutputDebugStringA("Account_MC\n");
-#endif
+	return crypto::constantTimeEquals(crypto::hashPassword(password, salt), hash);
 }
 
-/* String template to save account data */
-Account::Account(std::string strline)
+void Account::setPassword(const std::string& password)
 {
-	size_t ndelim = strline.find(';');
-	password = strline.substr(ndelim + 1, strline.length() - ndelim - 1);
-	username = strline.substr(0, ndelim);
-}
-
-/* Function to check if the account password matches the password input */
-bool Account::isCorrect(std::string password) { return password == this->password; }
-
-
-std::ostream& operator<<(std::ostream& os, Account& acc)
-{
-	os << acc.username << ';' << acc.password;
-	return os;
-}
-
-bool Account::operator==(Account& acc)
-{
-	return acc.username == username;
+	salt = crypto::randomHex(16);
+	hash = crypto::hashPassword(password, salt);
 }

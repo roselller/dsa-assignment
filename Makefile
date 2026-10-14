@@ -18,7 +18,7 @@ CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic $(OPT) -g -pthread -MMD -MP -Isr
 LDFLAGS  := -pthread $(SAN)
 
 # Code shared by both front-ends and the tests
-LIB_SRC := src/Sha256.cpp src/StringSearch.cpp
+LIB_SRC := src/Sha256.cpp src/StringSearch.cpp src/Comment.cpp src/Account.cpp src/Storage.cpp src/Forum.cpp
 LIB_OBJ := $(LIB_SRC:%.cpp=$(BUILD)/%.o)
 
 # Executables; each is only built once its main file exists
