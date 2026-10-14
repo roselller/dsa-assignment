@@ -1,5 +1,5 @@
 # Build output and runtime data
-build/
+build*/
 data/
 
 # macOS
