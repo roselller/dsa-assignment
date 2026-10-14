@@ -1,267 +1,232 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
-#include "Tools.h"
+#include <utility>
 
-const int  HASH_SIZE = 37;
-
-/* Used for constant time lookup for users */
-template<class K, class V>
-class Map
+/* 64-bit FNV-1a over every byte of the key */
+inline std::uint64_t fnv1a(const char* bytes, std::size_t n)
 {
+	std::uint64_t h = 14695981039346656037ULL;
+	for (std::size_t i = 0; i < n; i++)
+	{
+		h ^= static_cast<unsigned char>(bytes[i]);
+		h *= 1099511628211ULL;
+	}
+	return h;
+}
 
+template <class K>
+struct Hasher;
 
-protected:
+template <>
+struct Hasher<std::string>
+{
+	std::uint64_t operator()(const std::string& s) const { return fnv1a(s.data(), s.size()); }
+};
+
+template <>
+struct Hasher<int>
+{
+	std::uint64_t operator()(int v) const { return fnv1a(reinterpret_cast<const char*>(&v), sizeof v); }
+};
+
+/* Hash table using separate chaining. The bucket array doubles when the load
+   factor passes 0.75, so insert, find and erase are O(1) on average.
+   Nodes are relinked (never copied) on rehash, so a V* returned by find or
+   insertOrAssign stays valid until that entry is erased. */
+template <class K, class V, class Hash = Hasher<K>>
+class HashMap
+{
 	struct Node
 	{
-		V value;
 		K key;
+		V value;
 		Node* next;
-
-		Node() :
-			next(NULL)
-		{ }
-
-		Node(K key) :
-			next(NULL),
-			key(key)
-		{ }
-
-		Node(const Node& node) :
-			key(node.key),
-			value(node.value),
-			next(NULL)
-		{ }
+		Node(K k, V v) : key(std::move(k)), value(std::move(v)), next(nullptr) {}
 	};
-private:
-	Node* items[HASH_SIZE];
 
-protected:
+	static constexpr std::size_t kInitialBuckets = 16;
 
-	/* Constructors */
-	Map()
+	Node** buckets_ = nullptr;
+	std::size_t bucketCount_ = 0;
+	std::size_t size_ = 0;
+
+	std::size_t indexFor(const K& key, std::size_t buckets) const { return Hash{}(key) % buckets; }
+
+	void rehash(std::size_t newCount)
 	{
-		for (int i = 0; i < HASH_SIZE; i++)
+		Node** fresh = new Node*[newCount]();
+		for (std::size_t i = 0; i < bucketCount_; i++)
 		{
-			items[i] = NULL;
-		}
-	}
-
-	~Map()
-	{
-		for (int i = 0; i < HASH_SIZE; i++)
-		{
-			if (items[i])
+			Node* n = buckets_[i];
+			while (n)
 			{
-				Node* temp = items[i];
-				while (temp)
-				{
-					items[i] = temp->next;
-					delete temp;
-					temp = items[i];
-				}
+				Node* next = n->next;
+				std::size_t j = indexFor(n->key, newCount);
+				n->next = fresh[j];
+				fresh[j] = n;
+				n = next;
 			}
 		}
+		delete[] buckets_;
+		buckets_ = fresh;
+		bucketCount_ = newCount;
 	}
 
-	Map(const Map& map)
+	void destroyNodes()
 	{
-		for (int i = 0; i < HASH_SIZE; i++)
+		for (std::size_t i = 0; i < bucketCount_; i++)
 		{
-			if (map.items[i])
+			Node* n = buckets_[i];
+			while (n)
 			{
-				Node* temp = map.items[i],
-					** currentNode = &items[i];
-				while (temp)
-				{
-					*currentNode = new Node(*temp);
-					currentNode = &(*currentNode)->next;
-					temp = temp->next;
-				}
-			}
-			else
-			{
-				items[i] = NULL;
+				Node* next = n->next;
+				delete n;
+				n = next;
 			}
 		}
-	}
-
-	Map & operator=(const Map & map) = default;
-	
-	Map(Map&& map)
-	{
-		for (int i = 0; i < HASH_SIZE; i++)
-		{
-			items[i] = map.items[i];
-			map.items[i] = NULL;
-		}
-	}
-
-	/* Pushes the object using a key and returns the node for insertion by subclass */
-	Node* push(K key)
-	{
-		int hashIndex = Hash::hash<HASH_SIZE>(key);
-
-		if (items[hashIndex])
-		{
-			Node* temp = items[hashIndex];
-			while (temp->next)
-				temp = temp->next;
-			temp->next = new Node(key);
-			return temp;
-		}
-		items[hashIndex] = new Node(key);
-		return items[hashIndex];
-	}
-
-	/* Pops the item using the key */
-	void pop(K key, V& item)
-	{
-		int hashIndex = Hash::hash<HASH_SIZE>(key);
-		
-		if (items[hashIndex])
-		{
-			if (items[hashIndex]->value == item)
-			{
-				Node* temp = items[hashIndex]->next;
-				delete items[hashIndex];
-				items[hashIndex] = temp;
-			}
-			else
-			{
-				Node* temp = items[hashIndex];
-				while (temp->next)
-				{
-					if (temp->next->value == item)
-					{
-						Node* tempp = temp->next->next;
-						delete temp->next;
-						temp->next = tempp;
-						break;
-					}
-					temp = temp->next;
-				}
-			}
-		}
+		delete[] buckets_;
+		buckets_ = nullptr;
+		bucketCount_ = 0;
+		size_ = 0;
 	}
 
 public:
-	/* Gets the pointer to the item using the key, returns true is it gets, and false otherwise */
-	bool get(K key, V*& item)
+	/* One key/value pair as seen while iterating */
+	struct Entry
 	{
-		int hashIndex = Hash::hash<HASH_SIZE>(key);
-
-		if (items[hashIndex])
-		{
-			if (items[hashIndex]->key == key)
-			{
-				item = &items[hashIndex]->value;
-				return true;
-			}
-			else
-			{
-				Node* temp = items[hashIndex];
-				while (temp->next)
-				{
-					if (temp->next->key == key)
-					{
-						item = &temp->next->value;
-						return true;
-					}
-					temp = temp->next;
-				}
-			}
-		}
-		return false;
-	}
-	/* Returns true if the key exists, false otherwise */
-	bool exists(K& key)
-	{
-		int hashIndex = Hash::hash<HASH_SIZE>(key);
-
-		if (items[hashIndex])
-		{
-			if (items[hashIndex]->key == key)
-			{
-				return true;
-			}
-			else
-			{
-				Node* temp = items[hashIndex];
-				while (temp->next)
-				{
-					if (temp->next->key == key)
-					{
-						return true;
-					}
-					temp = temp->next;
-				}
-			}
-			return false;
-		}
-		return false;
-	}
-
-	/* Iterator for the Map, see Vector for more details */
-	struct Iterator
-	{
-		using iterator_category = std::forward_iterator_tag;
-		using difference_type = std::ptrdiff_t;
-		using value_type = V;
-		using pointer = V*;
-		using reference = V&;
-
-	private:
-		Node* pCurNode, **ppBaseNode, **ppEndNode;
-
-	public:
-		Iterator(Node** ppNode, Node** ppEndNode) :
-			ppBaseNode(ppNode),
-			pCurNode(*ppNode),
-			ppEndNode(ppEndNode)
-		{ }
-
-		reference operator*() const { return pCurNode->value; }
-		pointer operator->() { return &pCurNode->value; }
-		/* Checks if the curNode next is valid, otherwise iterate through the array until ppEndNode */
-		Iterator& operator++() 
-		{
-			if (pCurNode->next)
-			{
-				pCurNode = pCurNode->next;
-			}
-			else
-			{
-				if (ppBaseNode != ppEndNode)
-				{
-					ppBaseNode++;
-					while (!*ppBaseNode && ppBaseNode != ppEndNode)
-						ppBaseNode++;
-
-					/* If ppBase is valid, set it to current and return itself */
-					pCurNode = *ppBaseNode;
-				}
-			}
-			return *this;
-		}
-		Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-		friend bool operator== (const Iterator& a, const Iterator& b) { return a.pCurNode == b.pCurNode; };
-		friend bool operator!= (const Iterator& a, const Iterator& b){ return a.pCurNode != b.pCurNode; };
+		const K& key;
+		V& value;
 	};
 
-	/* Finds the first item in the Map */
-	Iterator begin()
+	/* Forward iterator. Walks each chain, then moves to the next non-empty
+	   bucket, checking the bucket bound before it dereferences anything. */
+	class Iterator
 	{
-		for (int i = 0; i < HASH_SIZE; i++)
+		Node* node_;
+		Node* const* bucket_;
+		Node* const* end_;
+
+		void settle()
 		{
-			if (items[i])
-				return Iterator(&items[i], &items[HASH_SIZE]);
+			while (!node_ && bucket_ != end_)
+			{
+				++bucket_;
+				if (bucket_ != end_)
+					node_ = *bucket_;
+			}
 		}
-		return end();
-	}
-	/* Treat the end of the array as the end */
-	Iterator end()
+
+	public:
+		Iterator(Node* const* bucket, Node* const* end) : node_(nullptr), bucket_(bucket), end_(end)
+		{
+			if (bucket_ != end_)
+				node_ = *bucket_;
+			settle();
+		}
+
+		Entry operator*() const { return Entry{ node_->key, node_->value }; }
+		Iterator& operator++()
+		{
+			node_ = node_->next;
+			settle();
+			return *this;
+		}
+		friend bool operator==(const Iterator& a, const Iterator& b) { return a.node_ == b.node_; }
+		friend bool operator!=(const Iterator& a, const Iterator& b) { return a.node_ != b.node_; }
+	};
+
+	HashMap() = default;
+
+	HashMap(const HashMap& other)
 	{
-		return Iterator(&items[HASH_SIZE], &items[HASH_SIZE]);
+		if (other.size_ > 0)
+			rehash(other.bucketCount_);
+		for (std::size_t i = 0; i < other.bucketCount_; i++)
+			for (Node* n = other.buckets_[i]; n; n = n->next)
+				insertOrAssign(n->key, n->value);
 	}
+
+	HashMap(HashMap&& other) noexcept :
+		buckets_(other.buckets_), bucketCount_(other.bucketCount_), size_(other.size_)
+	{
+		other.buckets_ = nullptr;
+		other.bucketCount_ = 0;
+		other.size_ = 0;
+	}
+
+	HashMap& operator=(HashMap other) noexcept
+	{
+		std::swap(buckets_, other.buckets_);
+		std::swap(bucketCount_, other.bucketCount_);
+		std::swap(size_, other.size_);
+		return *this;
+	}
+
+	~HashMap() { destroyNodes(); }
+
+	/* Pointer to the value stored under key, or nullptr */
+	V* find(const K& key)
+	{
+		if (bucketCount_ == 0)
+			return nullptr;
+		for (Node* n = buckets_[indexFor(key, bucketCount_)]; n; n = n->next)
+			if (n->key == key)
+				return &n->value;
+		return nullptr;
+	}
+
+	const V* find(const K& key) const { return const_cast<HashMap*>(this)->find(key); }
+
+	bool contains(const K& key) const { return find(key) != nullptr; }
+
+	/* Stores value under key, replacing any existing value. Returns the stored value. */
+	V& insertOrAssign(K key, V value)
+	{
+		if (V* existing = find(key))
+		{
+			*existing = std::move(value);
+			return *existing;
+		}
+		if (bucketCount_ == 0)
+			rehash(kInitialBuckets);
+		else if ((size_ + 1) * 4 > bucketCount_ * 3)
+			rehash(bucketCount_ * 2);
+
+		std::size_t i = indexFor(key, bucketCount_);
+		Node* n = new Node(std::move(key), std::move(value));
+		n->next = buckets_[i];
+		buckets_[i] = n;
+		size_++;
+		return n->value;
+	}
+
+	/* Removes key. Returns false if it was not present. */
+	bool erase(const K& key)
+	{
+		if (bucketCount_ == 0)
+			return false;
+		Node** link = &buckets_[indexFor(key, bucketCount_)];
+		while (*link)
+		{
+			if ((*link)->key == key)
+			{
+				Node* doomed = *link;
+				*link = doomed->next;
+				delete doomed;
+				size_--;
+				return true;
+			}
+			link = &(*link)->next;
+		}
+		return false;
+	}
+
+	std::size_t size() const { return size_; }
+	std::size_t bucketCount() const { return bucketCount_; }
+
+	Iterator begin() { return Iterator(buckets_, buckets_ + bucketCount_); }
+	Iterator end() { return Iterator(buckets_ + bucketCount_, buckets_ + bucketCount_); }
 };

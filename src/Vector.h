@@ -1,171 +1,127 @@
 #pragma once
 
-#include <string>
-#include <iostream>
-#include <Windows.h>
+#include <cassert>
+#include <utility>
 
-/* Generized dynamic array for storing objects */
+/* A growable array. Capacity doubles when full, so push is amortised O(1).
+   T must be default-constructible and move-assignable. */
 template <class T>
 class Vector
 {
-	T* ptr;
-	int maxElements;
-	int nElementCount;
+	T* data_ = nullptr;
+	int size_ = 0;
+	int cap_ = 0;
+
+	void grow(int newCap)
+	{
+		T* fresh = new T[newCap];
+		for (int i = 0; i < size_; i++)
+			fresh[i] = std::move(data_[i]);
+		delete[] data_;
+		data_ = fresh;
+		cap_ = newCap;
+	}
 
 public:
-	struct Iterator
+	Vector() = default;
+
+	Vector(const Vector& other)
 	{
-		/* Iterator to be used to DataAccessor, and only used as a forward iterator */
-		using iterator_category = std::forward_iterator_tag;
-		using difference_type = std::ptrdiff_t;
-		using value_type = T;
-		using pointer = T*;
-		using reference = T&;
-
-	private:
-		pointer ptr;
-	
-	public:
-		Iterator(pointer ptr) : ptr(ptr) {}
-
-		/* For dereferencing to get the current object of the current position in the data structure */
-		reference operator*() const { return *ptr; }
-		/* For dereferencing through arrow operator */
-		pointer operator->() { return ptr; }
-		/* For using arithmetic on the Iterator */
-		Iterator& operator++() { ptr++; return *this; }
-		Iterator operator++(int) { Iterator tmp = *this; ++(*this); return tmp; }
-		/* Used for comparing Iterator positions */
-		friend bool operator== (const Iterator& a, const Iterator& b) { return a.ptr == b.ptr; };
-		friend bool operator!= (const Iterator& a, const Iterator& b) { return a.ptr != b.ptr; };
-	};
-
-	/* Gets the starting element of the data structure, returns the end if it is empty */
-	Iterator begin()
-	{
-		if (nElementCount > 0)
-			return Iterator(&ptr[0]);
-		else
-			return end();
-	}
-
-	/* Indicate the end of the array */
-	Iterator end() { return Iterator(&ptr[nElementCount]); }
-
-	/* Constructor */
-	Vector() : maxElements(4), nElementCount(0), ptr(NULL)
-	{
-#if defined (_DEBUG)
-		OutputDebugStringA("Vector_DC\n");
-#endif
-	}
-
-	/* Destructor */
-	~Vector() 
-	{
-		if (ptr)
-			delete[] ptr;
-	}
-
-	/* Copy Constructor, used for copying */
-	Vector(const Vector& vec)
-	{
-#if defined (_DEBUG)
-		OutputDebugStringA("Vector_CC\n");
-#endif
-		ptr = NULL;
-		if (vec.ptr)
+		if (other.size_ > 0)
 		{
-			ptr = new T[vec.maxElements];
-			for (int i = 0; i < vec.nElementCount; i++)
-				ptr[i] = T(vec.ptr[i]);
+			data_ = new T[other.size_];
+			cap_ = other.size_;
+			for (int i = 0; i < other.size_; i++)
+				data_[i] = other.data_[i];
+			size_ = other.size_;
 		}
-
-		maxElements = vec.maxElements;
-		nElementCount = vec.nElementCount;
 	}
 
-	/* Copy Assignment Constructor, used for situation like, vec1 = vec2 */
-	Vector& operator=(const Vector& vec)
+	Vector(Vector&& other) noexcept :
+		data_(other.data_), size_(other.size_), cap_(other.cap_)
 	{
-		if (ptr)
-			delete[] ptr;
-		ptr = NULL;
-		/* Copies the contents if it is not empty */
-		if (vec.ptr)
-		{
-			ptr = new T[vec.maxElements];
-			for (int i = 0; i < vec.nElementCount; i++)
-				ptr[i] = T(vec.ptr[i]);
-		}
+		other.data_ = nullptr;
+		other.size_ = 0;
+		other.cap_ = 0;
+	}
 
-		maxElements = vec.maxElements;
-		nElementCount = vec.nElementCount;
+	/* Taking the argument by value gives copy-assignment and move-assignment
+	   in one function and makes self-assignment safe. */
+	Vector& operator=(Vector other) noexcept
+	{
+		std::swap(data_, other.data_);
+		std::swap(size_, other.size_);
+		std::swap(cap_, other.cap_);
 		return *this;
 	}
-	
-	/* Move Constructor */
-	Vector(Vector&& vec)
+
+	~Vector() { delete[] data_; }
+
+	/* Appends an item and returns a reference to the stored copy. The reference
+	   is invalidated by the next push or removal. */
+	T& push(T item)
 	{
-#if defined (_DEBUG)
-		OutputDebugStringA("Vector_MC\n");
-#endif
-		ptr = vec.ptr;
-		maxElements = vec.maxElements;
-		nElementCount = vec.nElementCount;
-		
-		vec.ptr = NULL;
-		vec.maxElements = 4;
-		vec.nElementCount = 0;
+		if (size_ == cap_)
+			grow(cap_ == 0 ? 4 : cap_ * 2);
+		data_[size_] = std::move(item);
+		return data_[size_++];
 	}
 
-	/* Default Move Constructor */
-	Vector& operator=(Vector&&) = default;
-
-	/* Pushes the object into the data structure at the back */
-	T* push(T&& item)
+	/* Removes the element at index i, shifting later elements down. O(n). */
+	void removeAt(int i)
 	{
-		/* Allocates the memory if not allocated yet */
-		if (ptr == NULL)
-			ptr = new T[maxElements];
-		else if (maxElements == (nElementCount+1))
-		{
-			maxElements += 4;
-			T* new_ptr = new T[maxElements];
-
-			/* Move the object to into the new memory location */
-			for (int i = 0; i < nElementCount; i++)
-				new_ptr[i] = std::move(ptr[i]);
-
-			delete[] ptr;
-			ptr = new_ptr;
-		}
-
-		ptr[nElementCount++] = std::move(item);
-		return &ptr[nElementCount - 1];
+		assert(i >= 0 && i < size_);
+		for (int j = i + 1; j < size_; j++)
+			data_[j - 1] = std::move(data_[j]);
+		/* Release whatever the vacated slot still holds */
+		data_[size_ - 1] = T();
+		size_--;
 	}
 
-	/* Pops the first object equivalent to the referenced object */
-	void pop(T& item)
+	/* Index of the first element equal to item, or -1 */
+	int indexOf(const T& item) const
 	{
-		if (nElementCount == 0)
-			return;
-
-		for (int i=0; i<nElementCount; i++)
-		{
-			if (item == ptr[i])
-			{
-				for (int j = i + 1; i < nElementCount; i++)
-					ptr[j - 1] = std::move(ptr[j]);
-			}
-		}
-
-		nElementCount--;
+		for (int i = 0; i < size_; i++)
+			if (data_[i] == item)
+				return i;
+		return -1;
 	}
 
-	/* returns the number of elements in the data structure */
-	int count() { return nElementCount; }
+	/* Removes the first element equal to item. Returns false if there is none. */
+	bool remove(const T& item)
+	{
+		int i = indexOf(item);
+		if (i < 0)
+			return false;
+		removeAt(i);
+		return true;
+	}
 
-	/* returns the element at nIndex position */
-	T& operator[](int nIndex) { return ptr[nIndex]; }
+	void clear()
+	{
+		for (int i = 0; i < size_; i++)
+			data_[i] = T();
+		size_ = 0;
+	}
+
+	int count() const { return size_; }
+	bool empty() const { return size_ == 0; }
+
+	T& operator[](int i)
+	{
+		assert(i >= 0 && i < size_);
+		return data_[i];
+	}
+	const T& operator[](int i) const
+	{
+		assert(i >= 0 && i < size_);
+		return data_[i];
+	}
+
+	/* Plain pointers are valid iterators, and nullptr + 0 is well defined, so an
+	   empty vector needs no special case. */
+	T* begin() { return data_; }
+	T* end() { return data_ + size_; }
+	const T* begin() const { return data_; }
+	const T* end() const { return data_ + size_; }
 };
