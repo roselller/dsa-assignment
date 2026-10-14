@@ -45,6 +45,12 @@ $(BUILD)/%.o: %.cpp
 $(BUILD)/tests/test_%: $(BUILD)/tests/test_%.o $(LIB_OBJ)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+$(BUILD)/forum-web: $(BUILD)/src/web_main.o $(BUILD)/src/WebServer.o $(LIB_OBJ)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
+$(BUILD)/forum: $(BUILD)/src/main.o $(BUILD)/src/Application.o $(BUILD)/src/Terminal.o $(LIB_OBJ)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+
 test: $(TEST_BIN) $(BINS)
 	@set -e; for t in $(TEST_BIN); do echo "== $$t"; $$t; done
 	@set -e; for s in $(E2E); do echo "== $$s"; BUILD=$(BUILD) bash $$s; done
