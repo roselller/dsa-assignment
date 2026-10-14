@@ -82,7 +82,7 @@ namespace storage
 
 	static bool toInt(const std::string& s, int& out)
 	{
-		long long v;
+		long long v = 0;
 		if (!toLong(s, v) || v < 0 || v > 2000000000LL)
 			return false;
 		out = static_cast<int>(v);
@@ -102,8 +102,8 @@ namespace storage
 
 	static bool parseTopic(const Vector<std::string>& f, Topic& t)
 	{
-		int id;
-		long long created;
+		int id = 0;
+		long long created = 0;
 		if (f.count() < 6 || !toInt(f[1], id) || id == 0 || !toLong(f[2], created))
 			return false;
 		t = Topic(id, unescape(f[3]), unescape(f[4]), unescape(f[5]), static_cast<std::time_t>(created));
@@ -113,8 +113,8 @@ namespace storage
 
 	static bool parsePost(const Vector<std::string>& f, Post& p)
 	{
-		int id;
-		long long created;
+		int id = 0;
+		long long created = 0;
 		if (f.count() < 6 || !toInt(f[1], id) || id == 0 || !toLong(f[2], created) ||
 			(f[4] != "0" && f[4] != "1"))
 			return false;
@@ -126,8 +126,8 @@ namespace storage
 
 	static bool parseReply(const Vector<std::string>& f, Comment& r)
 	{
-		int id;
-		long long created;
+		int id = 0;
+		long long created = 0;
 		if (f.count() < 5 || !toInt(f[1], id) || id == 0 || !toLong(f[2], created))
 			return false;
 		r = Comment(id, unescape(f[3]), unescape(f[4]), static_cast<std::time_t>(created));

@@ -288,7 +288,7 @@ void Application::topicsMenu()
 		}
 
 		std::string choice = upper(trim(ask(std::string("\n") + term_.magenta() + "Your Choice? " + term_.reset())));
-		int index;
+		int index = 0;
 		if (choice == "E")
 			return;
 		else if (choice == "C")
@@ -351,7 +351,7 @@ void Application::topicMenu(int topicId)
 		}
 
 		std::string choice = upper(trim(ask(std::string("\n") + term_.magenta() + "Your choice? " + term_.reset())));
-		int index;
+		int index = 0;
 		if (choice == "E")
 			return;
 		else if (choice == "L")
@@ -414,7 +414,7 @@ void Application::postMenu(int topicId, int postId)
 			std::cout << "Enter a reply number to like or unlike that reply.\n";
 
 		std::string choice = upper(trim(ask(std::string("\n") + term_.magenta() + "Your Choice? " + term_.reset())));
-		int index;
+		int index = 0;
 		bool liked = false;
 		if (choice == "E")
 			return;
@@ -482,7 +482,7 @@ void Application::searchMenu()
 		}
 
 		std::string choice = upper(trim(ask(std::string("\nEnter a number to open it, or E to go back: "))));
-		int index;
+		int index = 0;
 		if (choice == "E" || choice.empty())
 			return;
 		if (parseChoice(choice, hits.count(), index))

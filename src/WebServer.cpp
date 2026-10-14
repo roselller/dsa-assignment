@@ -105,11 +105,16 @@ namespace
 	/* Optional per-operation wording for the error cases */
 	struct Msgs
 	{
-		const char* invalid = nullptr;
-		const char* conflict = nullptr;
-		const char* forbidden = nullptr;
-		const char* unauthorized = nullptr;
-		const char* notFound = nullptr;
+		const char* invalid;
+		const char* conflict;
+		const char* forbidden;
+		const char* unauthorized;
+		const char* notFound;
+
+		Msgs(const char* invalid = nullptr, const char* conflict = nullptr, const char* forbidden = nullptr,
+			const char* unauthorized = nullptr, const char* notFound = nullptr) :
+			invalid(invalid), conflict(conflict), forbidden(forbidden), unauthorized(unauthorized), notFound(notFound)
+		{ }
 	};
 
 	/* Sends body on success, or a JSON error for any other status */

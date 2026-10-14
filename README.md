@@ -24,7 +24,10 @@ been rebuilt to run on macOS and Linux, gained a web interface, and had a round 
 
 ## Quick start
 
-You need a C++20 compiler (`clang++` or `g++`) and `make`. Nothing else to install.
+You need a C++20 compiler and `make`; nothing else to install. It was developed and tested on macOS
+with Apple clang. The code is standard C++20 plus a few POSIX calls (`flock`, `termios`, `isatty`),
+so Linux with `clang++` or `g++` should work, but that has not been tried. `make` uses `clang++`
+when it is installed; otherwise pass your compiler, e.g. `make CXX=g++`.
 
 ```sh
 make                 # builds build/forum-web and build/forum

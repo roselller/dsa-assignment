@@ -8,8 +8,11 @@
 #   make run        start the terminal client
 #   make clean
 
+# Prefer clang++ when it is installed; otherwise keep make's default C++ compiler (override with CXX=...)
 ifeq ($(origin CXX),default)
+ifneq ($(shell command -v clang++ 2>/dev/null),)
 CXX := clang++
+endif
 endif
 
 BUILD    ?= build
