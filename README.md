@@ -50,7 +50,7 @@ make ui-check    # drives the web UI in headless Chrome (needs Node 22+ and Chro
 
 ## Credits
 
-Written by Joshua Ng and Armirola Roseller III Tumolva (module group P03) as a DSA assignment, and
-later refurbished with the web interface. The HTTP layer is
+Written by Joshua Ng and Armirola Roseller III Tumolva as a DSA assignment, and
+later refurbished with the web interface with Claude. The HTTP layer is
 [cpp-httplib](https://github.com/yhirose/cpp-httplib) by Yuji Hirose, used under the MIT licence
 (`third_party/httplib.LICENSE`).
